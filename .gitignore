@@ -1,0 +1,33 @@
+# System Files
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules
+/src-tauri/target
+
+# SvelteKit / Vite
+/.svelte-kit
+/build
+/package
+.vercel
+.output
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Tauri V2
+/src-tauri/gen
+/src-tauri/binaries
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+.npmrc
+
+# IDEs
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
