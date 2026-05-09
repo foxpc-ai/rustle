@@ -1,4 +1,9 @@
-use tauri::Url;
+use tauri::{
+    http::{Request, Response},
+    AppHandle, Manager, Url,
+};
+
+use crate::AppState;
 
 pub const ALLOWED_PROPS: &[&str] = &[
     "color",
@@ -23,11 +28,13 @@ pub fn sanitize_css(css_content: String) -> String {
                 .split(';')
                 .filter_map(|rule| {
                     let rule = rule.trim();
-                    if rule.is_empty() { return None; }
+                    if rule.is_empty() {
+                        return None;
+                    }
 
                     let (prop, val) = rule.split_once(':')?;
                     let prop = prop.trim().to_lowercase();
-                    
+
                     if ALLOWED_PROPS.binary_search(&prop.as_str()).is_ok() {
                         Some(format!("{}: {}", prop, val.trim()))
                     } else {
@@ -52,4 +59,65 @@ pub fn extract_query_param(uri: &str, key: &str) -> Option<String> {
     url.query_pairs()
         .find(|(k, _)| k == key)
         .map(|(_, v)| v.into_owned())
+}
+
+pub fn handle_epub_asset_request(
+    handle: &AppHandle,
+    request: Request<Vec<u8>>,
+) -> Response<Vec<u8>> {
+    let uri = request.uri().to_string();
+    let ch_idx = extract_query_param(&uri, "ch").and_then(|v| v.parse::<usize>().ok());
+    let rel_path = extract_query_param(&uri, "path");
+
+    let not_found = || {
+        Response::builder()
+            .status(404)
+            .header("Access-Control-Allow-Origin", "*")
+            .body(Vec::new())
+            .unwrap()
+    };
+
+    let (Some(idx), Some(path)) = (ch_idx, rel_path) else {
+        return not_found();
+    };
+
+    let asset_data = {
+        let state = handle.state::<AppState>();
+        let session_guard = state.current_book.lock().unwrap();
+
+        let Some(session) = session_guard.as_ref() else {
+            return not_found();
+        };
+
+        match session.book.get_resource(&session.mmap, idx, &path, None) {
+            Ok(content) => content.into_owned(),
+            Err(_) => return not_found(),
+        }
+    };
+
+    let extension = path.split('.').next_back().unwrap_or("").to_lowercase();
+    let builder = Response::builder().header("Access-Control-Allow-Origin", "*");
+
+    if extension == "css" {
+        let original_css = String::from_utf8_lossy(&asset_data).into_owned();
+        let clean_css = sanitize_css(original_css);
+        return builder
+            .header("Content-Type", "text/css")
+            .body(clean_css.into_bytes())
+            .unwrap();
+    }
+
+    let mime_type = match extension.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "woff" | "woff2" => "font/woff2",
+        _ => "application/octet-stream",
+    };
+
+    builder
+        .header("Content-Type", mime_type)
+        .body(asset_data)
+        .unwrap()
 }
