@@ -1,13 +1,22 @@
 <script lang="ts">
-    import type { NavItem } from "$lib/eBookLoader";
+    import NavTree from "./NavTree.svelte";
+    import type { NavItem as NavItemType } from "$lib/eBookLoader";
     import { fade } from "svelte/transition";
+    import { SvelteSet } from "svelte/reactivity";
 
-    export let items: NavItem[];
-    export let currentHref: string;
-    export let onSelect: (spine_index: number, href: string) => void;
-    export let depth = 0;
+    let {
+        items,
+        currentHref,
+        onSelect,
+        depth = 0,
+    }: {
+        items: NavItemType[];
+        currentHref: string;
+        onSelect: (spine_index: number, href: string) => void;
+        depth?: number;
+    } = $props();
 
-    let expandedItems = new Set<string>();
+    let expandedItems = new SvelteSet<string>();
 
     function toggleExpand(href: string, e: MouseEvent) {
         e.stopPropagation();
@@ -16,7 +25,6 @@
         } else {
             expandedItems.add(href);
         }
-        expandedItems = expandedItems;
     }
 </script>
 
@@ -25,14 +33,14 @@
         ? 'mt-1 ml-4 border-l border-stone-500/10'
         : ''}"
 >
-    {#each items as item}
+    {#each items as item (item.href)}
         {@const hasChildren = item.children && item.children.length > 0}
         {@const isExpanded = expandedItems.has(item.href)}
 
         <li>
             <div class="group flex items-center gap-1">
                 <button
-                    on:click={() => onSelect(item.spine_index, item.href)}
+                    onclick={() => onSelect(item.spine_index, item.href)}
                     class="flex-1 text-left py-1.5 px-3 rounded text-sm transition-all
                     {currentHref === item.href
                         ? 'bg-orange-500/10 text-orange-600 font-bold'
@@ -43,7 +51,7 @@
 
                 {#if hasChildren}
                     <button
-                        on:click={(e) => toggleExpand(item.href, e)}
+                        onclick={(e) => toggleExpand(item.href, e)}
                         class="p-2 opacity-40 hover:opacity-100 transition-transform {isExpanded
                             ? 'rotate-90'
                             : ''}"
@@ -59,15 +67,16 @@
                             stroke-width="3"
                             stroke-linecap="round"
                             stroke-linejoin="round"
-                            ><path d="m9 18 6-6-6-6" /></svg
                         >
+                            <path d="m9 18 6-6-6-6" />
+                        </svg>
                     </button>
                 {/if}
             </div>
 
             {#if hasChildren && isExpanded}
                 <div transition:fade={{ duration: 150 }}>
-                    <svelte:self
+                    <NavTree
                         items={item.children}
                         {currentHref}
                         {onSelect}
