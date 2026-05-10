@@ -18,9 +18,15 @@
         </div>
     {/if}
 
-    <article class="reading-content">
-        {@html htmlContent}
-    </article>
+    {#key htmlContent}
+        <article 
+            class="reading-content"
+            in:fade={{ duration: 80, delay: 5 }}
+            out:fade={{ duration: 0 }}
+        >
+            {@html htmlContent}
+        </article>
+    {/key}
 </div>
 
 <style>

@@ -26,6 +26,13 @@
             expandedItems.add(href);
         }
     }
+
+    function containsActiveChild(item: NavItemType): boolean {
+        if (!item.children) return false;
+        return item.children.some(
+            (child) => child.href === currentHref || containsActiveChild(child),
+        );
+    }
 </script>
 
 <ul
@@ -36,13 +43,15 @@
     {#each items as item (item.href)}
         {@const hasChildren = item.children && item.children.length > 0}
         {@const isExpanded = expandedItems.has(item.href)}
+        {@const isActive = currentHref === item.href}
+        {@const isParentOfActive = containsActiveChild(item)}
 
         <li>
             <div class="group flex items-center gap-1">
                 <button
                     onclick={() => onSelect(item.spine_index, item.href)}
                     class="flex-1 text-left py-1.5 px-3 rounded text-sm transition-all
-                    {currentHref === item.href
+                        {isActive || isParentOfActive
                         ? 'bg-orange-500/10 text-orange-600 font-bold'
                         : 'opacity-60 hover:opacity-100 hover:bg-stone-500/5'}"
                 >
