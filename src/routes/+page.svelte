@@ -3,12 +3,11 @@
     import { fade } from "svelte/transition";
     import { goto } from "$app/navigation";
     import {
-        libraryBooks,
-        loadingStatus,
+        library,
         scanLibrary,
         loadLibrary,
-        selectedBook,
-    } from "$lib/eLibLoader";
+        type LibraryItem,
+    } from "$lib/eLibLoader.svelte";
     import BookCard from "$lib/components/library/BookCard.svelte";
 
     let trackElement = $state<HTMLElement | null>(null);
@@ -47,8 +46,8 @@
         }
     };
 
-    function handleBookClick(book: any) {
-        selectedBook.set(book);
+    function handleBookClick(book: LibraryItem) {
+        library.selectedBook = book;
         goto("/reader");
     }
 
@@ -66,19 +65,27 @@
 <main
     class="bg-stone-950 h-screen w-screen overflow-hidden m-0 p-0 select-none cursor-grab active:cursor-grabbing"
 >
-    <div class="fixed top-10 left-10 z-50 flex flex-col gap-4 items-start">
+    <div
+        class="fixed top-10 left-10 z-50 flex flex-col gap-4 items-start"
+        role="toolbar"
+        aria-label="Library controls"
+    >
         <button
             onclick={scanLibrary}
-            disabled={$loadingStatus === "loading"}
+            disabled={library.loadingStatus === "loading"}
             class="bg-white/5 hover:bg-white/10 text-white/80 hover:text-white px-6 py-3 rounded-full backdrop-blur-xl transition-all border border-white/10 text-xs uppercase tracking-widest font-bold disabled:opacity-50"
+            aria-busy={library.loadingStatus === "loading"}
         >
-            {$loadingStatus === "loading" ? "Scanning..." : "Sync Library"}
+            {library.loadingStatus === "loading"
+                ? "Scanning..."
+                : "Sync Library"}
         </button>
 
-        {#if $loadingStatus === "error"}
+        {#if library.loadingStatus === "error"}
             <div
                 transition:fade={{ duration: 200 }}
                 class="flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-2 rounded-2xl backdrop-blur-xl text-sm"
+                role="alert"
             >
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -90,6 +97,7 @@
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
+                    aria-hidden="true"
                 >
                     <circle cx="12" cy="12" r="10" /><line
                         x1="12"
@@ -100,9 +108,9 @@
                 </svg>
                 <span>Failed to sync library</span>
                 <button
-                    onclick={() => loadingStatus.set("idle")}
+                    onclick={() => (library.loadingStatus = "idle")}
                     class="ml-1 p-1 hover:text-white transition-colors"
-                    aria-label="Dismiss"
+                    aria-label="Dismiss error"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -122,14 +130,19 @@
         id="image-track"
         bind:this={trackElement}
         class="flex gap-[4vmin] absolute left-[50%] top-[50%]"
+        role="list"
+        aria-label="Book collection"
     >
-        {#each $libraryBooks as book (book.id || book.title)}
-            <BookCard {book} onclick={() => handleBookClick(book)} />
+        {#each library.books as book (book.id || book.title)}
+            <div role="listitem">
+                <BookCard {book} onclick={() => handleBookClick(book)} />
+            </div>
         {/each}
     </div>
 
     <div
         class="absolute bottom-10 left-1/2 -translate-x-1/2 text-white/20 text-[10px] uppercase tracking-[0.5em]"
+        aria-hidden="true"
     >
         Click and Drag to Explore
     </div>
