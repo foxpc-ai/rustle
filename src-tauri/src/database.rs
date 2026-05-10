@@ -26,7 +26,7 @@ impl Db {
                 author TEXT,
                 file_path TEXT NOT NULL UNIQUE,
                 cover_path TEXT,
-                last_cfi TEXT,
+                last_position TEXT,
                 opened_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )",
             [],
@@ -82,4 +82,41 @@ pub fn load_settings(state: State<'_, AppState>) -> Result<HashMap<String, Strin
         map.insert(k, v);
     }
     Ok(map)
+}
+
+#[tauri::command]
+pub fn update_last_position(
+    state: State<'_, AppState>,
+    file_path: String,
+    position: String,
+) -> Result<(), String> {
+    let db = state.db.lock().unwrap();
+
+    db.conn
+        .execute(
+            "UPDATE books SET last_position = ?1 WHERE file_path = ?2",
+            params![position, file_path],
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_last_position(
+    state: State<'_, AppState>,
+    file_path: String,
+) -> Result<Option<String>, String> {
+    let db = state.db.lock().unwrap();
+
+    let mut stmt = db
+        .conn
+        .prepare("SELECT last_position FROM books WHERE file_path = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let position = stmt
+        .query_row(params![file_path], |row| row.get::<_, Option<String>>(0))
+        .map_err(|e| e.to_string())?;
+
+    Ok(position)
 }

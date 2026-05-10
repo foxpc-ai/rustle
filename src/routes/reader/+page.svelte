@@ -109,7 +109,10 @@
             </span>
 
             <button
-                onclick={() => goto("/")}
+                onclick={async () => {
+                    await readerCore.saveCurrentPosition();
+                    goto("/");
+                }}
                 class="icon-btn text-red-500/60 hover:text-red-500"
                 aria-label="Exit Reader"
             >

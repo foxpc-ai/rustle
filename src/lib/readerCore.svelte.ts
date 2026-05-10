@@ -1,8 +1,7 @@
 import { tick } from "svelte";
-import { get } from "svelte/store";
 import { library } from "$lib/eLibLoader.svelte";
 import { openBook, getChapter, flattenToc, type NavItem } from "$lib/eBookLoader";
-import { rewriteResourceUrls } from "$lib/epubUtils";
+import { rewriteResourceUrls, saveProgress, getProgress } from "$lib/epubUtils";
 import { readerStatus } from "$lib/readerState.svelte";
 
 let toc = $state<NavItem[]>([]);
@@ -12,6 +11,8 @@ let currentIndex = $state(-1);
 let activeTocIndex = $state(0);
 let currentHref = $state("");
 
+const idRegex = /<p(?=\s|>)/g;
+
 export const readerCore = {
     get toc() { return toc; },
     get htmlContent() { return htmlContent; },
@@ -19,7 +20,36 @@ export const readerCore = {
     get currentHref() { return currentHref; },
     get flatToc() { return flatToc; },
 
-    async loadChapter(spineIndex: number, href: string) {
+    async saveCurrentPosition() {
+        const book = library.selectedBook;
+        if (!book || currentIndex === -1) return;
+
+        const viewport = document.querySelector("#reader-viewport");
+        const article = viewport?.querySelector("article");
+
+        if (!viewport || !article) return;
+
+        const scrollTarget = viewport.scrollTop + 20;
+
+        const paras = article.querySelectorAll("[data-rustle-id]");
+
+        let currentId = "p-0";
+
+        for (const p of paras) {
+            const htmlP = p as HTMLElement;
+            if (htmlP.offsetTop >= scrollTarget) {
+                currentId = htmlP.getAttribute("data-rustle-id") || "p-0";
+                break;
+            }
+            currentId = htmlP.getAttribute("data-rustle-id") || "p-0";
+        }
+
+        const positionString = `${currentIndex}:${currentId}`;
+        console.log(positionString)
+        await saveProgress(book.path, positionString);
+    },
+
+    async loadChapter(spineIndex: number, href: string, targetId?: string) {
         const book = library.selectedBook;
         if (!book) return;
 
@@ -30,10 +60,10 @@ export const readerCore = {
 
         if (isNewFile || !htmlContent) {
             const loaderTimeout = setTimeout(() => (readerStatus.isLoading = true), 100);
-
             try {
                 const raw = await getChapter(book.path, spineIndex);
-                htmlContent = rewriteResourceUrls(raw, spineIndex);
+                const withUrls = rewriteResourceUrls(raw, spineIndex);
+                htmlContent = assignIds(withUrls);
                 currentIndex = spineIndex;
             } finally {
                 clearTimeout(loaderTimeout);
@@ -42,7 +72,17 @@ export const readerCore = {
         }
 
         await tick();
-        document.querySelector("#reader-viewport")?.scrollTo({ top: 0, behavior: "instant" });
+
+        const viewport = document.querySelector("#reader-viewport");
+        if (targetId) {
+            const element = document.querySelector(`[data-rustle-id="${targetId}"]`);
+            if (element) {
+                element.scrollIntoView({ behavior: "instant" });
+                return;
+            }
+        }
+
+        viewport?.scrollTo({ top: 0, behavior: "instant" });
     },
 
     async init() {
@@ -52,6 +92,20 @@ export const readerCore = {
         const nested = await openBook(book.path);
         toc = nested;
         flatToc = flattenToc(nested);
+
+        const savedPos = await getProgress(book.path);
+
+        if (savedPos && savedPos.includes(":")) {
+            const [spineIdxStr, paraId] = savedPos.split(":");
+            const spineIndex = parseInt(spineIdxStr);
+
+            const chapter = flatToc.find(item => item.spine_index === spineIndex);
+
+            if (chapter) {
+                await this.loadChapter(spineIndex, chapter.href, paraId);
+                return;
+            }
+        }
 
         if (flatToc.length > 0) {
             await this.loadChapter(flatToc[0].spine_index, flatToc[0].href);
@@ -72,3 +126,13 @@ export const readerCore = {
         }
     }
 };
+
+function assignIds(content: string): string {
+    let idCounter = 0;
+
+    return content.replace(idRegex, (match) => {
+        const newTag = `<p data-rustle-id="p-${idCounter}"`;
+        idCounter++;
+        return newTag;
+    });
+}

@@ -5,7 +5,7 @@ use tauri::Manager;
 
 use crate::{
     book_view::{get_book_resource, get_chapter_content, open_book},
-    database::{load_settings, save_settings, Db},
+    database::{get_last_position, load_settings, save_settings, update_last_position, Db},
     lib_view::{add_book, get_library, sync_library},
     utils::handle_epub_asset_request,
 };
@@ -56,6 +56,8 @@ pub fn run() {
             get_book_resource,
             save_settings,
             load_settings,
+            get_last_position,
+            update_last_position,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
