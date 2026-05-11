@@ -27,4 +27,4 @@ tauri-plugin-dialog = "2"
 light_epub = { git = "https://github.com/foxpc-ai/light-epub",features = ["serde", "alloc"] }
 rusqlite = { version = "0.38.0", features = ["bundled"] }
 memmap2 = "0.9"
-
+tauri-plugin-log = "2.8.0"

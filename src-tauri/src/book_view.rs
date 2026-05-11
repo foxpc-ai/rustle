@@ -4,6 +4,7 @@ use memmap2::Mmap;
 use std::fs::File;
 use std::io::ErrorKind;
 use tauri::State;
+use tauri_plugin_log::log::{error, warn};
 
 #[tauri::command]
 pub async fn open_book(state: State<'_, AppState>, path: String) -> Result<Vec<NavItem>, String> {
@@ -65,7 +66,7 @@ pub async fn get_chapter_content(
         Ok(content) => Ok(content.to_vec()),
 
         Err(light_epub::errors::EpubError::ScratchBufferTooSmall) => {
-            println!(
+            warn!(
                 "Chapter {} exceeds 128KB, retrying with auto-allocation",
                 index
             );
@@ -75,13 +76,13 @@ pub async fn get_chapter_content(
                 .map(|content| content.to_vec())
                 .map_err(|e| {
                     let log_msg = format!("Critical EPUB error after retry: {:?}", e);
-                    eprintln!("{}", log_msg);
+                    error!("{}", log_msg);
                     "Failed to process large chapter".to_string()
                 })
         }
 
         Err(e) => {
-            eprintln!(
+            error!(
                 "Backend Error: get_chapter_content(index: {}) failed with: {:?}",
                 index, e
             );

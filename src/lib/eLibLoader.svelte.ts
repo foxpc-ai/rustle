@@ -1,5 +1,6 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { error } from '@tauri-apps/plugin-log';
 
 export interface LibraryItem {
     id: number;
@@ -34,7 +35,7 @@ export async function loadLibrary() {
         library.books = processCoverPaths(books);
         library.loadingStatus = 'loaded';
     } catch (e) {
-        console.error("Failed to load library:", e);
+        error(`Failed to load library:${e}`);
         library.loadingStatus = 'error';
     }
 }
@@ -55,7 +56,7 @@ export async function scanLibrary() {
         library.books = processCoverPaths(books);
         library.loadingStatus = 'loaded';
     } catch (e) {
-        console.error("Failed to scan library:", e);
+        error(`Failed to scan library:${e}`);
         library.loadingStatus = 'error';
     }
 }

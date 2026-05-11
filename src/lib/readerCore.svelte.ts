@@ -45,7 +45,6 @@ export const readerCore = {
         }
 
         const positionString = `${currentIndex}:${currentId}`;
-        console.log(positionString)
         await saveProgress(book.path, positionString);
     },
 

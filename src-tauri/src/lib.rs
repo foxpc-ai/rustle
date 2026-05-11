@@ -2,6 +2,7 @@ use light_epub::book::Book;
 use memmap2::Mmap;
 use std::sync::Mutex;
 use tauri::Manager;
+use tauri_plugin_log::{Builder, RotationStrategy, Target, TargetKind};
 
 use crate::{
     book_view::{get_book_resource, get_chapter_content, open_book},
@@ -30,6 +31,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(Builder::new().targets([
+            Target::new(TargetKind::Stdout),
+            Target::new(TargetKind::LogDir {
+                file_name: Some("rustle".into()),
+            }),
+        ]).rotation_strategy(RotationStrategy::KeepOne).build())
         .setup(|app| {
             let app_handle = app.handle();
             let db = Db::init(app_handle)?;

@@ -13,6 +13,7 @@
     import NavTree from "$lib/components/NavTree.svelte";
     import SettingsModal from "$lib/components/reader/SettingsModal.svelte";
     import ReaderCanvas from "$lib/components/reader/ReaderCanvas.svelte";
+    import { error } from "@tauri-apps/plugin-log";
 
     function handleKeydown(e: KeyboardEvent) {
         if (readerStatus.showSettings || readerStatus.showToc) return;
@@ -32,8 +33,8 @@
             try {
                 await initSettings();
                 await readerCore.init();
-            } catch (err) {
-                console.error("Initialization error:", err);
+            } catch (e) {
+                error(`Initialization error: ${e}`);
             }
         })();
 

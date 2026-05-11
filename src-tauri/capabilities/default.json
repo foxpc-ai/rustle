@@ -2,12 +2,15 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "opener:default",
     "dialog:default",
     "fs:default",
+    "log:default",
     {
       "identifier": "fs:allow-app-read-recursive",
       "allow": [
@@ -16,6 +19,5 @@
         }
       ]
     }
-
   ]
 }

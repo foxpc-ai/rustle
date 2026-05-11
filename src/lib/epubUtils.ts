@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { error } from '@tauri-apps/plugin-log';
 
 export function rewriteResourceUrls(html: string, spineIndex: number): string {
     const assetUrlBase = `http://epub-asset.localhost/img?ch=${spineIndex}&path=`;
@@ -24,7 +25,7 @@ export async function saveProgress(filePath: string, position: string) {
     try {
         await invoke("update_last_position", { filePath, position });
     } catch (e) {
-        console.error("Failed to save progress:", e);
+        error(`Failed to save progress: ${e}`);
     }
 }
 
@@ -32,7 +33,7 @@ export async function getProgress(filePath: string): Promise<string | null> {
     try {
         return await invoke<string | null>("get_last_position", { filePath });
     } catch (e) {
-        console.error("Failed to load progress:", e);
+        error(`Failed to load progress: ${e}`);
         return null;
     }
 }

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { error } from '@tauri-apps/plugin-log';
 
 export interface NavItem {
     title: string;
@@ -10,9 +11,9 @@ export interface NavItem {
 export async function openBook(path: string): Promise<NavItem[]> {
     try {
         return await invoke<NavItem[]>("open_book", { path });
-    } catch (error) {
-        console.error("Failed to open book:", error);
-        throw new Error(error as string);
+    } catch (e) {
+        error(`Failed to open book: ${e}`);
+        throw new Error(e as string);
     }
 }
 

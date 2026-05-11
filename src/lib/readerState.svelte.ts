@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { error } from '@tauri-apps/plugin-log';
 
 export const readerPrefs = $state({
     fontSize: 18,
@@ -21,7 +22,7 @@ export async function initSettings() {
             if (saved.brightness) readerPrefs.brightness = parseFloat(saved.brightness);
         }
     } catch (e) {
-        console.error("Failed to load settings from DB", e);
+        error(`Failed to load settings from DB ${e}`);
     }
 }
 
@@ -35,7 +36,7 @@ $effect.root(() => {
 
         const timer = setTimeout(() => {
             invoke("save_settings", { settings: settingsMap })
-                .catch(e => console.error("Failed to save settings:", e));
+                .catch(e => error(`Failed to save settings: ${e}`));
         }, 2000);
 
         return () => clearTimeout(timer);
