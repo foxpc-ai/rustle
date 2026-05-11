@@ -40,7 +40,11 @@ pub async fn open_book(state: State<'_, AppState>, path: String) -> Result<Vec<N
             .map_err(|e| e.to_string())?;
     }
 
-    let mut session = state.current_book.lock().unwrap();
+    let mut session = state.current_book.lock().map_err(|e| {
+        let err_msg = format!("Failed to lock book session: {}", e);
+        error!("{}", err_msg);
+        err_msg
+    })?;
     *session = Some(BookSession { mmap, book });
 
     Ok(toc)
@@ -51,7 +55,11 @@ pub async fn get_chapter_content(
     state: State<'_, AppState>,
     index: usize,
 ) -> Result<Vec<u8>, String> {
-    let session_lock = state.current_book.lock().unwrap();
+    let session_lock = state.current_book.lock().map_err(|e| {
+        let err_msg = format!("Failed to lock book session: {}", e);
+        error!("{}", err_msg);
+        err_msg
+    })?;
     let session = session_lock
         .as_ref()
         .ok_or_else(|| "No book open".to_string())?;
@@ -98,7 +106,11 @@ pub async fn get_book_resource(
     chapter_idx: usize,
     rel_path: String,
 ) -> Result<Vec<u8>, String> {
-    let session_lock = state.current_book.lock().unwrap();
+    let session_lock = state.current_book.lock().map_err(|e| {
+        let err_msg = format!("Failed to lock book session: {}", e);
+        error!("{}", err_msg);
+        err_msg
+    })?;
     let session = session_lock.as_ref().ok_or("No book open")?;
 
     let res = session
