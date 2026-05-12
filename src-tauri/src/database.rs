@@ -1,12 +1,20 @@
 use crate::AppState;
 use rusqlite::{params, Connection};
-use std::collections::HashMap;
-use std::fs;
+use rusqlite_migration::{Migrations, M};
+use std::{collections::HashMap, fs, sync::LazyLock};
 use tauri::{AppHandle, Manager, State};
 
 pub struct Db {
     pub conn: Connection,
 }
+
+static MIGRATION_FILES: &[M<'static>] = &[M::up(include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/migrations/01_init.sql"
+)))];
+
+static MIGRATIONS: LazyLock<Migrations<'static>> =
+    LazyLock::new(|| Migrations::new(MIGRATION_FILES.to_vec()));
 
 impl Db {
     pub fn init(app_handle: &AppHandle) -> Result<Self, Box<dyn std::error::Error>> {
@@ -17,28 +25,9 @@ impl Db {
 
         let sqlite_path = app_dir.join("library.db");
 
-        let conn = Connection::open(sqlite_path)?;
+        let mut conn = Connection::open(sqlite_path)?;
 
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS books (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                author TEXT,
-                file_path TEXT NOT NULL UNIQUE,
-                cover_path TEXT,
-                last_position TEXT,
-                opened_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )",
-            [],
-        )?;
-
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT
-            )",
-            [],
-        )?;
+        MIGRATIONS.to_latest(&mut conn)?;
 
         Ok(Db { conn })
     }

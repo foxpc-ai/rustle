@@ -31,12 +31,17 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(Builder::new().targets([
-            Target::new(TargetKind::Stdout),
-            Target::new(TargetKind::LogDir {
-                file_name: Some("rustle".into()),
-            }),
-        ]).rotation_strategy(RotationStrategy::KeepOne).build())
+        .plugin(
+            Builder::new()
+                .targets([
+                    Target::new(TargetKind::Stdout),
+                    Target::new(TargetKind::LogDir {
+                        file_name: Some("rustle".into()),
+                    }),
+                ])
+                .rotation_strategy(RotationStrategy::KeepOne)
+                .build(),
+        )
         .setup(|app| {
             let app_handle = app.handle();
             let db = Db::init(app_handle)?;
