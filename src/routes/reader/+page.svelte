@@ -1,5 +1,6 @@
 <script lang="ts">
     import "$lib/styles/reader-theme.css";
+    import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import { fly } from "svelte/transition";
     import { goto } from "$app/navigation";
@@ -112,6 +113,11 @@
             <button
                 onclick={async () => {
                     await readerCore.saveCurrentPosition();
+                    try {
+                        await invoke("close_book");
+                    } catch (e) {
+                        error(`Failed to close book session: ${e}`);
+                    }
                     goto("/");
                 }}
                 class="icon-btn text-red-500/60 hover:text-red-500"

@@ -120,3 +120,15 @@ pub async fn get_book_resource(
 
     Ok(res.to_vec())
 }
+
+#[tauri::command]
+pub async fn close_book(state: State<'_, AppState>) -> Result<(), String> {
+    let mut session = state.current_book.lock().map_err(|e| {
+        let err_msg = format!("Failed to lock book session: {}", e);
+        error!("{}", err_msg);
+        err_msg
+    })?;
+
+    *session = None;
+    Ok(())
+}
