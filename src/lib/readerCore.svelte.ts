@@ -88,6 +88,13 @@ export const readerCore = {
         const book = library.selectedBook;
         if (!book) return;
 
+        htmlContent = "";
+        currentIndex = -1;
+        currentHref = "";
+        activeTocIndex = 0;
+        toc = [];
+        flatToc = [];
+
         const nested = await openBook(book.path);
         toc = nested;
         flatToc = flattenToc(nested);
