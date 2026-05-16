@@ -3,6 +3,7 @@
     import { fade } from "svelte/transition";
     import { goto } from "$app/navigation";
     import { info, warn, error as logError } from "@tauri-apps/plugin-log";
+    import { listen, type UnlistenFn } from "@tauri-apps/api/event"; 
     import {
         library,
         scanLibrary,
@@ -18,23 +19,13 @@
 
     let isInitialLoad = $state(true);
 
-    const handleDown = (e: MouseEvent) => {
-        mouseDownAt = e.clientX;
-    };
-
-    const handleUp = () => {
-        mouseDownAt = 0;
-        prevPercentage = percentage;
-    };
-
+    const handleDown = (e: MouseEvent) => { mouseDownAt = e.clientX; };
+    const handleUp = () => { mouseDownAt = 0; prevPercentage = percentage; };
     const handleMove = (e: MouseEvent) => {
         if (mouseDownAt === 0 || !trackElement) return;
-
         const mouseDelta = mouseDownAt - e.clientX;
         const maxDelta = window.innerWidth / 2;
-
-        const nextUnconstrained =
-            prevPercentage + (mouseDelta / maxDelta) * -100;
+        const nextUnconstrained = prevPercentage + (mouseDelta / maxDelta) * -100;
         percentage = Math.max(Math.min(nextUnconstrained, 0), -100);
 
         trackElement.animate(
@@ -54,7 +45,7 @@
     async function handleScan() {
         info("User triggered library scan via UI");
         try {
-            await scanLibrary();
+            await scanLibrary(); 
         } catch (e) {
             logError(`Scan failed: ${e}`);
         }
@@ -67,13 +58,14 @@
     }
 
     onMount(() => {
-        info("Library component mounted: Syncing state");
+        info("Library component mounted: Syncing state & setting up event listeners");
+        
+        let unlistenImported: UnlistenFn;
+        let unlistenFinished: UnlistenFn;
 
         loadLibrary()
             .then(() => {
-                info(
-                    `loadLibrary complete. Found ${library.books.length} items`,
-                );
+                info(`loadLibrary complete. Found ${library.books.length} items`);
             })
             .catch((e) => {
                 logError(`Critical failure during initial load: ${e}`);
@@ -81,6 +73,25 @@
             .finally(() => {
                 isInitialLoad = false;
             });
+
+        const setupListeners = async () => {
+            unlistenImported = await listen("book-imported", () => {
+                info("Event received: book-imported. Re-fetching fresh library snapshot.");
+                loadLibrary(); 
+            });
+
+            unlistenFinished = await listen("sync-finished", () => {
+                info("Event received: sync-finished. Processing complete.");
+                library.loadingStatus = "idle";
+            });
+        };
+
+        setupListeners();
+
+        return () => {
+            if (unlistenImported) unlistenImported();
+            if (unlistenFinished) unlistenFinished();
+        };
     });
 
     $effect(() => {

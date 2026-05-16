@@ -1,12 +1,12 @@
+use futures_util::stream::{self, StreamExt};
 use light_epub::book::Book;
-use std::sync::Mutex;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::sync::{Arc, Mutex};
 
-use crate::database::Db;
-use crate::AppState;
+use crate::{database::Db, utils, AppState};
 
 #[derive(serde::Serialize)]
 pub struct LibraryItem {
@@ -22,7 +22,8 @@ async fn process_book_and_store(
     app: &tauri::AppHandle,
     db: &Mutex<Db>,
 ) -> Result<(), String> {
-    let data = std::fs::read(&file_path).map_err(|e| e.to_string())?;
+    let data = utils::read_book(&file_path)?;
+
     let package = Book::get_metadata(&data).map_err(|_| "Metadata error")?;
 
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -38,7 +39,7 @@ async fn process_book_and_store(
             let _ = std::fs::write(&local_cover_path, img);
         }
     }
-
+    drop(data);
     {
         let db_guard = db.lock().unwrap();
         db_guard
@@ -105,15 +106,44 @@ pub async fn sync_library(
     folder_path: String,
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<LibraryItem>, String> {
+) -> Result<(), String> {
     let entries = std::fs::read_dir(folder_path).map_err(|e| e.to_string())?;
 
-    for entry in entries.flatten() {
-        if entry.path().extension().is_some_and(|ext| ext == "epub") {
-            let _ =
-                process_book_and_store(entry.path().to_string_lossy().to_string(), &app, &state.db)
-                    .await;
-        }
+    let epub_paths: Vec<String> = entries
+        .flatten()
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "epub"))
+        .map(|e| e.path().to_string_lossy().to_string())
+        .collect();
+
+    if epub_paths.is_empty() {
+        let _ = app.emit("sync-finished", ());
+        return Ok(());
     }
-    get_library(state).await
+
+    let app_handle = app.clone();
+    let db_clone = Arc::clone(&state.db);
+
+    tauri::async_runtime::spawn(async move {
+        stream::iter(epub_paths)
+            .map(|path| {
+                let app_handle_inner = app_handle.clone();
+                let db_inner = Arc::clone(&db_clone);
+
+                async move {
+                    if process_book_and_store(path, &app_handle_inner, &db_inner)
+                        .await
+                        .is_ok()
+                    {
+                        let _ = app_handle_inner.emit("book-imported", ());
+                    }
+                }
+            })
+            .buffer_unordered(4)
+            .collect::<()>()
+            .await;
+
+        let _ = app_handle.emit("sync-finished", ());
+    });
+
+    Ok(())
 }

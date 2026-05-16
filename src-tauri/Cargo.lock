@@ -3394,6 +3394,7 @@ dependencies = [
 name = "rustle"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "light_epub",
  "memmap2",
  "rusqlite",

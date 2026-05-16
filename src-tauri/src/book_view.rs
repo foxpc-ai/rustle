@@ -1,30 +1,11 @@
-use crate::{AppState, BookSession};
+use crate::{utils, AppState, BookSession};
 use light_epub::{book::Book, nav::NavItem};
-use memmap2::Mmap;
-use std::fs::File;
-use std::io::ErrorKind;
 use tauri::State;
 use tauri_plugin_log::log::{error, warn};
 
 #[tauri::command]
 pub async fn open_book(state: State<'_, AppState>, path: String) -> Result<Vec<NavItem>, String> {
-    let file = match File::open(&path) {
-        Ok(f) => f,
-        Err(e) => {
-            return Err(match e.kind() {
-                ErrorKind::NotFound => format!("File not found at path: {}", path),
-                ErrorKind::PermissionDenied => {
-                    "Permission denied while opening the file".to_string()
-                }
-                ErrorKind::Interrupted => {
-                    "File opening was interrupted. Please try again.".to_string()
-                }
-                _ => format!("System error opening file: {}", e),
-            })
-        }
-    };
-
-    let mmap = unsafe { Mmap::map(&file).map_err(|e| e.to_string())? };
+    let mmap = utils::read_book(&path)?;
 
     let book = Book::new(&mmap).map_err(|_| "Failed to parse EPUB")?;
     let toc = book.get_toc(&mmap).map_err(|_| "Failed to get TOC")?;

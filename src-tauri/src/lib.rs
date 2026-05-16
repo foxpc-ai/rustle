@@ -1,11 +1,11 @@
 use light_epub::book::Book;
 use memmap2::Mmap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use tauri_plugin_log::{Builder, RotationStrategy, Target, TargetKind};
 
 use crate::{
-    book_view::{get_book_resource, get_chapter_content, open_book,close_book},
+    book_view::{close_book, get_book_resource, get_chapter_content, open_book},
     database::{get_last_position, load_settings, save_settings, update_last_position, Db},
     lib_view::{add_book, get_library, sync_library},
     utils::handle_epub_asset_request,
@@ -22,7 +22,7 @@ pub struct BookSession {
 }
 
 pub struct AppState {
-    pub db: Mutex<Db>,
+    pub db: Arc<Mutex<Db>>,
     pub current_book: Mutex<Option<BookSession>>,
 }
 
@@ -46,7 +46,7 @@ pub fn run() {
             let app_handle = app.handle();
             let db = Db::init(app_handle)?;
             app.manage(AppState {
-                db: Mutex::new(db),
+                db: Arc::new(Mutex::new(db)),
                 current_book: Mutex::new(None),
             });
             Ok(())

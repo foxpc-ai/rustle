@@ -1,3 +1,5 @@
+use memmap2::Mmap;
+use std::io::ErrorKind;
 use tauri::{
     http::{Request, Response},
     AppHandle, Manager, Url,
@@ -19,7 +21,7 @@ pub const ALLOWED_PROPS: &[&str] = &[
     "text-indent",
 ];
 
-pub fn sanitize_css(css_content: String) -> String {
+pub(crate) fn sanitize_css(css_content: String) -> String {
     let mut sanitized = String::with_capacity(css_content.len());
 
     for block in css_content.split('}') {
@@ -54,14 +56,14 @@ pub fn sanitize_css(css_content: String) -> String {
     sanitized
 }
 
-pub fn extract_query_param(uri: &str, key: &str) -> Option<String> {
+pub(crate) fn extract_query_param(uri: &str, key: &str) -> Option<String> {
     let url = Url::parse(uri).ok()?;
     url.query_pairs()
         .find(|(k, _)| k == key)
         .map(|(_, v)| v.into_owned())
 }
 
-pub fn handle_epub_asset_request(
+pub(crate) fn handle_epub_asset_request(
     handle: &AppHandle,
     request: Request<Vec<u8>>,
 ) -> Response<Vec<u8>> {
@@ -120,4 +122,24 @@ pub fn handle_epub_asset_request(
         .header("Content-Type", mime_type)
         .body(asset_data)
         .unwrap()
+}
+
+pub(crate) fn read_book(file_path: &str) -> Result<Mmap, String> {
+    let data = match std::fs::File::open(file_path) {
+        Ok(f) => f,
+        Err(e) => {
+            return Err(match e.kind() {
+                ErrorKind::NotFound => format!("File not found at path: {}", file_path),
+                ErrorKind::PermissionDenied => {
+                    "Permission denied while opening the file".to_string()
+                }
+                ErrorKind::Interrupted => {
+                    "File opening was interrupted. Please try again.".to_string()
+                }
+                _ => format!("System error opening file: {}", e),
+            })
+        }
+    };
+
+    Ok(unsafe { Mmap::map(&data).map_err(|e| e.to_string())? })
 }
