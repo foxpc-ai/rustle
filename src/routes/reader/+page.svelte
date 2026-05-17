@@ -10,7 +10,7 @@
         readerStatus,
         initSettings,
     } from "$lib/readerState.svelte";
-    import { readerCore } from "$lib/readerCore.svelte";
+    import { readerCore, scrollViewport } from "$lib/readerCore.svelte";
     import NavTree from "$lib/components/NavTree.svelte";
     import SettingsModal from "$lib/components/reader/SettingsModal.svelte";
     import ReaderCanvas from "$lib/components/reader/ReaderCanvas.svelte";
@@ -20,6 +20,15 @@
         if (readerStatus.showSettings || readerStatus.showToc) return;
         if (e.key === "ArrowRight") readerCore.goNext();
         if (e.key === "ArrowLeft") readerCore.goPrev();
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            scrollViewport("down");
+        }
+        if (e.key === "ArrowUp") {
+            e.preventDefault();
+            scrollViewport("up");
+        }
     }
 
     onMount(() => {

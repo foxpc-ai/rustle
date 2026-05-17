@@ -142,3 +142,13 @@ function assignIds(content: string): string {
         return newTag;
     });
 }
+
+export function scrollViewport(direction: "up" | "down") {
+    const viewport = document.querySelector("#reader-viewport");
+    if (!viewport) return;
+    
+    const scrollAmount = 40;
+    const distance = direction === "down" ? scrollAmount : -scrollAmount;
+    
+    viewport.scrollBy({ top: distance, behavior: "auto" });
+}
