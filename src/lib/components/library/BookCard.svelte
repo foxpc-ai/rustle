@@ -1,6 +1,7 @@
 <script lang="ts">
+	import type { LibraryItem } from "$lib/eLibLoader.svelte";
 	let { book, onclick } = $props<{
-		book: any;
+		book: LibraryItem;
 		onclick: () => void;
 	}>();
 </script>

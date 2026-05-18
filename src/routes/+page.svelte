@@ -3,7 +3,7 @@
     import { fade } from "svelte/transition";
     import { goto } from "$app/navigation";
     import { info, warn, error as logError } from "@tauri-apps/plugin-log";
-    import { listen, type UnlistenFn } from "@tauri-apps/api/event"; 
+    import { listen, type UnlistenFn } from "@tauri-apps/api/event";
     import {
         library,
         scanLibrary,
@@ -19,13 +19,19 @@
 
     let isInitialLoad = $state(true);
 
-    const handleDown = (e: MouseEvent) => { mouseDownAt = e.clientX; };
-    const handleUp = () => { mouseDownAt = 0; prevPercentage = percentage; };
+    const handleDown = (e: MouseEvent) => {
+        mouseDownAt = e.clientX;
+    };
+    const handleUp = () => {
+        mouseDownAt = 0;
+        prevPercentage = percentage;
+    };
     const handleMove = (e: MouseEvent) => {
         if (mouseDownAt === 0 || !trackElement) return;
         const mouseDelta = mouseDownAt - e.clientX;
         const maxDelta = window.innerWidth / 2;
-        const nextUnconstrained = prevPercentage + (mouseDelta / maxDelta) * -100;
+        const nextUnconstrained =
+            prevPercentage + (mouseDelta / maxDelta) * -100;
         percentage = Math.max(Math.min(nextUnconstrained, 0), -100);
 
         trackElement.animate(
@@ -45,7 +51,7 @@
     async function handleScan() {
         info("User triggered library scan via UI");
         try {
-            await scanLibrary(); 
+            await scanLibrary();
         } catch (e) {
             logError(`Scan failed: ${e}`);
         }
@@ -54,18 +60,34 @@
     function handleBookClick(book: LibraryItem) {
         info(`Navigating to reader for book: ${book.title}`);
         library.selectedBook = book;
-        goto("/reader").catch(e => logError(`Navigation failed: ${e}`));
+        goto("/reader").catch((e) => logError(`Navigation failed: ${e}`));
     }
 
     onMount(() => {
-        info("Library component mounted: Syncing state & setting up event listeners");
-        
+        info(
+            "Library component mounted: Syncing state & setting up event listeners",
+        );
+
         let unlistenImported: UnlistenFn;
         let unlistenFinished: UnlistenFn;
 
+        let importedCount = 0;
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const triggerReload = () => {
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+                debounceTimer = null;
+            }
+            importedCount = 0;
+            loadLibrary();
+        };
+
         loadLibrary()
             .then(() => {
-                info(`loadLibrary complete. Found ${library.books.length} items`);
+                info(
+                    `loadLibrary complete. Found ${library.books.length} items`,
+                );
             })
             .catch((e) => {
                 logError(`Critical failure during initial load: ${e}`);
@@ -76,12 +98,24 @@
 
         const setupListeners = async () => {
             unlistenImported = await listen("book-imported", () => {
-                info("Event received: book-imported. Re-fetching fresh library snapshot.");
-                loadLibrary(); 
+                importedCount++;
+
+                if (importedCount >= 4) {
+                    info("Batch threshold met (4 books). Reloading UI.");
+                    triggerReload();
+                    return;
+                }
+
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    info("100ms silence timeout met. Flusher triggered.");
+                    triggerReload();
+                }, 100);
             });
 
             unlistenFinished = await listen("sync-finished", () => {
-                info("Event received: sync-finished. Processing complete.");
+                info("Event received: sync-finished. Finalizing UI state.");
+                triggerReload();
                 library.loadingStatus = "idle";
             });
         };
@@ -91,6 +125,7 @@
         return () => {
             if (unlistenImported) unlistenImported();
             if (unlistenFinished) unlistenFinished();
+            if (debounceTimer) clearTimeout(debounceTimer);
         };
     });
 

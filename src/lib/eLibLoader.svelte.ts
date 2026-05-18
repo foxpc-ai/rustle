@@ -51,12 +51,11 @@ export async function scanLibrary() {
         if (!selected) return;
 
         library.loadingStatus = 'loading';
-        const books = await invoke('sync_library', { folderPath: selected }) as LibraryItem[];
 
-        library.books = processCoverPaths(books);
-        library.loadingStatus = 'loaded';
+        await invoke('sync_library', { folderPath: selected });
+
     } catch (e) {
-        error(`Failed to scan library:${e}`);
+        error(`Failed to scan library: ${e}`);
         library.loadingStatus = 'error';
     }
 }
