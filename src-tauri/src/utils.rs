@@ -21,6 +21,34 @@ pub const ALLOWED_PROPS: &[&str] = &[
     "text-indent",
 ];
 
+const _: () = {
+    let mut i = 1;
+    while i < ALLOWED_PROPS.len() {
+        if !is_ordered(ALLOWED_PROPS[i - 1], ALLOWED_PROPS[i]) {
+            panic!("ALLOWED_PROPS is not sorted alphabetically");
+        }
+        i += 1;
+    }
+};
+
+const fn is_ordered(a: &str, b: &str) -> bool {
+    let a = a.as_bytes();
+    let b = b.as_bytes();
+    let mut i = 0;
+    let min_len = if a.len() < b.len() { a.len() } else { b.len() };
+
+    while i < min_len {
+        if a[i] < b[i] {
+            return true;
+        }
+        if a[i] > b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    a.len() <= b.len()
+}
+
 pub(crate) fn sanitize_css(css_content: String) -> String {
     let mut sanitized = String::with_capacity(css_content.len());
 
