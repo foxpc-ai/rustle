@@ -19,7 +19,7 @@
     {/if}
 
     {#key htmlContent}
-        <article 
+        <article
             class="reading-content"
             in:fade={{ duration: 80, delay: 5 }}
             out:fade={{ duration: 0 }}
