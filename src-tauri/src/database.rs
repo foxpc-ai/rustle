@@ -8,10 +8,16 @@ pub struct Db {
     pub conn: Connection,
 }
 
-static MIGRATION_FILES: &[M<'static>] = &[M::up(include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/migrations/01_init.sql"
-)))];
+static MIGRATION_FILES: &[M<'static>] = &[
+    M::up(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/migrations/01_init.sql"
+    ))),
+    M::up(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/migrations/02_annotations.sql"
+    ))),
+];
 
 static MIGRATIONS: LazyLock<Migrations<'static>> =
     LazyLock::new(|| Migrations::new(MIGRATION_FILES.to_vec()));
@@ -78,13 +84,14 @@ pub fn update_last_position(
     state: State<'_, AppState>,
     file_path: String,
     position: String,
+    progress: f64,
 ) -> Result<(), String> {
     let db = state.db.lock().unwrap();
 
     db.conn
         .execute(
-            "UPDATE books SET last_position = ?1 WHERE file_path = ?2",
-            params![position, file_path],
+            "UPDATE books SET last_position = ?1, progress = ?2 WHERE file_path = ?3",
+            params![position, progress, file_path],
         )
         .map_err(|e| e.to_string())?;
 

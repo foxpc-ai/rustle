@@ -45,7 +45,11 @@ export const readerCore = {
         }
 
         const positionString = `${currentIndex}:${currentId}`;
-        await saveProgress(book.path, positionString);
+
+        const totalChapters = flatToc.length > 1 ? flatToc.length - 1 : 1;
+        let bookProgress = currentIndex / totalChapters;
+
+        await saveProgress(book.path, positionString, bookProgress);
     },
 
     async loadChapter(spineIndex: number, href: string, targetId?: string) {

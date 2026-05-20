@@ -15,6 +15,7 @@ pub struct LibraryItem {
     pub author: String,
     pub path: String,
     cover: Option<String>,
+    pub progress: f64,
 }
 
 async fn process_book_and_store(
@@ -67,7 +68,7 @@ pub async fn get_library(state: tauri::State<'_, AppState>) -> Result<Vec<Librar
     let mut stmt = db_guard
         .conn
         .prepare(
-            "SELECT rowid, title, author, file_path, cover_path FROM books ORDER BY opened_at DESC",
+            "SELECT rowid, title, author, file_path, cover_path, progress FROM books ORDER BY opened_at DESC",
         )
         .map_err(|e| e.to_string())?;
 
@@ -79,6 +80,7 @@ pub async fn get_library(state: tauri::State<'_, AppState>) -> Result<Vec<Librar
                 author: row.get(2)?,
                 path: row.get(3)?,
                 cover: row.get(4)?,
+                progress: row.get(5)?,
             })
         })
         .map_err(|e| e.to_string())?;

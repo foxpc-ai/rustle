@@ -8,6 +8,7 @@ export interface LibraryItem {
     author: string;
     path: string;
     cover: string | null;
+    progress: number
 }
 
 

@@ -21,9 +21,9 @@ export function rewriteResourceUrls(html: string, spineIndex: number): string {
     });
 }
 
-export async function saveProgress(filePath: string, position: string) {
+export async function saveProgress(filePath: string, position: string, progress: number) {
     try {
-        await invoke("update_last_position", { filePath, position });
+        await invoke("update_last_position", { filePath, position, progress });
     } catch (e) {
         error(`Failed to save progress: ${e}`);
     }
