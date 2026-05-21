@@ -1,6 +1,7 @@
 use futures_util::stream::{self, StreamExt};
 use light_epub::book::Book;
 use tauri::{Emitter, Manager};
+use tauri_plugin_log::log::warn;
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -146,6 +147,38 @@ pub async fn sync_library(
 
         let _ = app_handle.emit("sync-finished", ());
     });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_book(
+    state: tauri::State<'_, AppState>,
+    file_path: String,
+) -> Result<(), String> {
+    std::fs::remove_file(&file_path).map_err(|e| format!("Failed to delete book file: {}", e))?;
+
+    let db_guard = state.db.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = db_guard
+        .conn
+        .prepare("SELECT cover_path FROM books WHERE file_path = ?1")
+        .map_err(|e| e.to_string())?;
+
+    if let Ok(Some(cover_path)) =
+        stmt.query_row([&file_path], |row| row.get::<_, Option<String>>(0))
+    {
+        let _ = std::fs::remove_file(&cover_path).map_err(|e| {
+            warn!(
+                "Error while deleting cover for {file_path} cover path is {cover_path} error is {e}"
+            )
+        });
+    }
+
+    db_guard
+        .conn
+        .execute("DELETE FROM books WHERE file_path = ?1", [&file_path])
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }

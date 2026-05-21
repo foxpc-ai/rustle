@@ -1,6 +1,6 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { error } from '@tauri-apps/plugin-log';
+import { error as logError } from '@tauri-apps/plugin-log';
 
 export interface LibraryItem {
     id: number;
@@ -15,7 +15,23 @@ export interface LibraryItem {
 export const library = $state({
     books: [] as LibraryItem[],
     loadingStatus: 'idle' as 'idle' | 'loading' | 'error' | 'loaded',
-    selectedBook: null as LibraryItem | null
+    selectedBook: null as LibraryItem | null,
+
+    async removeBook(path: string) {
+        try {
+            await invoke("delete_book", { filePath: path });
+
+            this.books = this.books.filter(b => b.path !== path);
+
+            if (this.selectedBook?.path === path) {
+                this.selectedBook = null;
+            }
+        } catch (error) {
+            logError(`Failed to delete book: ${error}`);
+            alert("Could not delete book file.");
+        }
+    }
+
 });
 
 function processCoverPaths(books: LibraryItem[]): LibraryItem[] {
@@ -36,7 +52,7 @@ export async function loadLibrary() {
         library.books = processCoverPaths(books);
         library.loadingStatus = 'loaded';
     } catch (e) {
-        error(`Failed to load library:${e}`);
+        logError(`Failed to load library:${e}`);
         library.loadingStatus = 'error';
     }
 }
@@ -56,7 +72,7 @@ export async function scanLibrary() {
         await invoke('sync_library', { folderPath: selected });
 
     } catch (e) {
-        error(`Failed to scan library: ${e}`);
+        logError(`Failed to scan library: ${e}`);
         library.loadingStatus = 'error';
     }
 }

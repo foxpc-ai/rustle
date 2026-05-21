@@ -7,7 +7,7 @@ use tauri_plugin_log::{Builder, RotationStrategy, Target, TargetKind};
 use crate::{
     book_view::{close_book, get_book_resource, get_chapter_content, open_book},
     database::{get_last_position, load_settings, save_settings, update_last_position, Db},
-    lib_view::{add_book, get_library, sync_library},
+    lib_view::{add_book, delete_book, get_library, sync_library},
     utils::handle_epub_asset_request,
 };
 
@@ -70,7 +70,8 @@ pub fn run() {
             load_settings,
             get_last_position,
             update_last_position,
-            close_book
+            close_book,
+            delete_book
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
