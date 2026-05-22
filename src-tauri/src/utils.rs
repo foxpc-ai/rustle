@@ -1,11 +1,12 @@
 use memmap2::Mmap;
-use std::io::ErrorKind;
+use std::{io::ErrorKind, sync::Mutex};
 use tauri::{
     http::{Request, Response},
     AppHandle, Manager, Url,
 };
+use tauri_plugin_log::log::warn;
 
-use crate::AppState;
+use crate::{database::Db, AppState};
 
 pub const ALLOWED_PROPS: &[&str] = &[
     "color",
@@ -170,4 +171,30 @@ pub(crate) fn read_book(file_path: &str) -> Result<Mmap, String> {
     };
 
     Ok(unsafe { Mmap::map(&data).map_err(|e| e.to_string())? })
+}
+
+pub(crate) fn remove_book_metadata_and_cover(db: &Mutex<Db>, file_path: &str) -> Result<(), String> {
+    let db_guard = db.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = db_guard
+        .conn
+        .prepare("SELECT cover_path FROM books WHERE file_path = ?1")
+        .map_err(|e| e.to_string())?;
+
+    if let Ok(Some(cover_path)) =
+        stmt.query_row([file_path], |row| row.get::<_, Option<String>>(0))
+    {
+        let _ = std::fs::remove_file(&cover_path).map_err(|e| {
+            warn!(
+                "Error while deleting cover for {file_path} cover path is {cover_path} error is {e}"
+            )
+        });
+    }
+
+    db_guard
+        .conn
+        .execute("DELETE FROM books WHERE file_path = ?1", [file_path])
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
