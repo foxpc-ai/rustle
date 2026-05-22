@@ -19,6 +19,20 @@ export const library = $state({
 
     async removeBook(path: string) {
         try {
+            await invoke("remove_book", { filePath: path });
+
+            this.books = this.books.filter(b => b.path !== path);
+
+            if (this.selectedBook?.path === path) {
+                this.selectedBook = null;
+            }
+        } catch (error) {
+            logError(`Failed to delete book: ${error}`);
+        }
+    },
+
+    async deleteBook(path: string) {
+        try {
             await invoke("delete_book", { filePath: path });
 
             this.books = this.books.filter(b => b.path !== path);
@@ -28,7 +42,6 @@ export const library = $state({
             }
         } catch (error) {
             logError(`Failed to delete book: ${error}`);
-            alert("Could not delete book file.");
         }
     }
 
