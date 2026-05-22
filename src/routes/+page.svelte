@@ -12,41 +12,38 @@
     } from "$lib/eLibLoader.svelte";
     import BookCard from "$lib/components/library/BookCard.svelte";
 
-    let trackElement = $state<HTMLElement | null>(null);
-    let mouseDownAt = $state(0);
-    let prevPercentage = $state(0);
-    let percentage = $state(0);
-
     let isInitialLoad = $state(true);
+    let searchQuery = $state("");
+    let sortKey = $state<"opened_at" | "title" | "author" | "progress">(
+        "opened_at",
+    );
 
-    const handleDown = (e: MouseEvent) => {
-        mouseDownAt = e.clientX;
+    const sortLabels: Record<typeof sortKey, string> = {
+        opened_at: "Recent",
+        title: "Title",
+        author: "Author",
+        progress: "Progress",
     };
-    const handleUp = () => {
-        mouseDownAt = 0;
-        prevPercentage = percentage;
-    };
-    const handleMove = (e: MouseEvent) => {
-        if (mouseDownAt === 0 || !trackElement) return;
-        const mouseDelta = mouseDownAt - e.clientX;
-        const maxDelta = window.innerWidth / 2;
-        const nextUnconstrained =
-            prevPercentage + (mouseDelta / maxDelta) * -100;
-        percentage = Math.max(Math.min(nextUnconstrained, 0), -100);
 
-        trackElement.animate(
-            { transform: `translate(${percentage}%, -50%)` },
-            { duration: 1200, fill: "forwards" },
-        );
+    const filteredBooks = $derived.by(() => {
+        const q = searchQuery.trim().toLowerCase();
+        let books = q
+            ? library.books.filter(
+                  (b) =>
+                      b.title.toLowerCase().includes(q) ||
+                      b.author.toLowerCase().includes(q),
+              )
+            : [...library.books];
 
-        const images = trackElement.getElementsByClassName("image");
-        for (const image of images) {
-            image.animate(
-                { objectPosition: `${100 + percentage}% center` },
-                { duration: 1200, fill: "forwards" },
-            );
-        }
-    };
+        books.sort((a, b) => {
+            if (sortKey === "title") return a.title.localeCompare(b.title);
+            if (sortKey === "author") return a.author.localeCompare(b.author);
+            if (sortKey === "progress") return b.progress - a.progress;
+            return 0;
+        });
+
+        return books;
+    });
 
     async function handleScan() {
         info("User triggered library scan via UI");
@@ -136,24 +133,14 @@
     });
 </script>
 
-<svelte:window
-    onmousedown={handleDown}
-    onmousemove={handleMove}
-    onmouseup={handleUp}
-/>
-
 <main
-    class="bg-stone-950 h-screen w-screen overflow-hidden m-0 p-0 select-none cursor-grab active:cursor-grabbing"
+    class="bg-stone-950 h-screen w-screen overflow-hidden m-0 p-0 flex flex-col select-none"
 >
-    <div
-        class="fixed top-10 left-10 z-50 flex flex-col gap-4 items-start"
-        role="toolbar"
-        aria-label="Library controls"
-    >
+    <div class="flex items-center gap-3 px-8 pt-8 pb-4 flex-shrink-0 z-10">
         <button
             onclick={handleScan}
             disabled={library.loadingStatus === "loading"}
-            class="bg-white/5 hover:bg-white/10 text-white/80 hover:text-white px-6 py-3 rounded-full backdrop-blur-xl transition-all border border-white/10 text-xs uppercase tracking-widest font-bold disabled:opacity-50"
+            class="bg-white/5 hover:bg-white/10 text-white/80 hover:text-white px-5 py-2.5 rounded-full backdrop-blur-xl transition-all border border-white/10 text-xs uppercase tracking-widest font-bold disabled:opacity-50 flex-shrink-0"
             aria-busy={library.loadingStatus === "loading"}
         >
             {library.loadingStatus === "loading"
@@ -161,10 +148,45 @@
                 : "Sync Library"}
         </button>
 
+        <div class="relative flex-1 max-w-xs">
+            <svg
+                class="absolute left-3 top-1/2 -translate-y-1/2 opacity-30"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                aria-hidden="true"
+            >
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+                type="search"
+                placeholder="Search titles, authors…"
+                bind:value={searchQuery}
+                class="w-full bg-white/5 border border-white/10 rounded-full pl-9 pr-4 py-2.5 text-xs text-white/80 placeholder:text-white/25 outline-none focus:border-white/20 focus:bg-white/8 transition-all"
+            />
+        </div>
+
+        <div class="flex gap-1 ml-auto flex-shrink-0">
+            {#each Object.keys(sortLabels) as Array<typeof sortKey> as key}
+                <button
+                    onclick={() => (sortKey = key)}
+                    class="px-3 py-1.5 rounded-full text-[10px] uppercase tracking-widest font-bold transition-all {sortKey ===
+                    key
+                        ? 'bg-white/15 text-white'
+                        : 'text-white/30 hover:text-white/60'}"
+                >
+                    {sortLabels[key]}
+                </button>
+            {/each}
+        </div>
+
         {#if library.loadingStatus === "error"}
             <div
                 transition:fade={{ duration: 200 }}
-                class="flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-2 rounded-2xl backdrop-blur-xl text-sm"
+                class="flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-2 rounded-2xl backdrop-blur-xl text-sm flex-shrink-0"
                 role="alert"
             >
                 <svg
@@ -207,11 +229,11 @@
     </div>
 
     {#if isInitialLoad}
-        <div class="h-full w-full bg-stone-950"></div>
+        <div class="flex-1 bg-stone-950"></div>
     {:else if library.books.length === 0 && library.loadingStatus !== "loading"}
         <div
             transition:fade={{ duration: 400 }}
-            class="absolute inset-0 flex flex-col items-center justify-center text-center px-6"
+            class="flex-1 flex flex-col items-center justify-center text-center px-6"
         >
             <div class="space-y-6 max-w-md">
                 <h1 class="text-stone-400 text-2xl font-light tracking-tight">
@@ -223,7 +245,7 @@
                 </p>
                 <button
                     onclick={handleScan}
-                    class="group relative inline-flex items-center gap-3 bg-white text-black px-8 py-4 rounded-full font-bold text-sm uppercase tracking-widest hover:scale-105 transition-transform active:scale-95 shadow-2xl shadow-white/10"
+                    class="inline-flex items-center gap-3 bg-white text-black px-8 py-4 rounded-full font-bold text-sm uppercase tracking-widest hover:scale-105 transition-transform active:scale-95 shadow-2xl shadow-white/10"
                 >
                     Add a Folder
                     <svg
@@ -242,41 +264,55 @@
                 </button>
             </div>
         </div>
+    {:else if filteredBooks.length === 0}
+        <div
+            transition:fade={{ duration: 200 }}
+            class="flex-1 flex items-center justify-center text-stone-500 text-sm"
+        >
+            No books match "{searchQuery}"
+        </div>
     {:else}
         <div
-            id="image-track"
-            bind:this={trackElement}
-            class="flex gap-[4vmin] absolute left-[50%] top-[50%]"
+            id="shelf"
+            class="flex-1 overflow-x-auto overflow-y-hidden"
             role="list"
             aria-label="Book collection"
         >
-            {#each library.books as book (book.id || book.title)}
-                <div role="listitem">
-                    <BookCard {book} onclick={() => handleBookClick(book)} />
-                </div>
-            {/each}
-        </div>
-
-        <div
-            transition:fade
-            class="absolute bottom-10 left-1/2 -translate-x-1/2 text-white/20 text-[10px] uppercase tracking-[0.5em]"
-            aria-hidden="true"
-        >
-            Click and Drag to Explore
+            <div class="shelf-grid h-full px-8 pb-8">
+                {#each filteredBooks as book (book.id || book.title)}
+                    <div role="listitem">
+                        <BookCard
+                            {book}
+                            onclick={() => handleBookClick(book)}
+                        />
+                    </div>
+                {/each}
+            </div>
         </div>
     {/if}
 </main>
 
 <style>
-    #image-track {
-        display: flex;
-        user-select: none;
-        transform: translate(0%, -50%);
-        will-change: transform;
+    #shelf {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
     }
 
-    :global(.image) {
-        object-position: 100% center;
-        will-change: object-position;
+    #shelf::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    #shelf::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+    }
+
+    .shelf-grid {
+        display: grid;
+        grid-template-rows: 1fr;
+        grid-auto-flow: column;
+        grid-auto-columns: max-content;
+        gap: 7vmin;
+        align-items: center;
     }
 </style>
