@@ -40,7 +40,7 @@
         ? 'mt-1 ml-4 border-l border-stone-500/10'
         : ''}"
 >
-    {#each items as item (item.href)}
+    {#each items as item, index (`${item.href}-${index}`)}
         {@const hasChildren = item.children && item.children.length > 0}
         {@const isExpanded = expandedItems.has(item.href)}
         {@const isActive = currentHref === item.href}
