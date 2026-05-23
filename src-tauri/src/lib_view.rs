@@ -2,8 +2,6 @@ use futures_util::stream::{self, StreamExt};
 use light_epub::book::Book;
 use tauri::{Emitter, Manager};
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
 use crate::{database::Db, utils, AppState};
@@ -18,6 +16,16 @@ pub struct LibraryItem {
     pub progress: f64,
 }
 
+/// FNV-1a algorithm
+fn generate_hash(s: &str) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325; // FNV offset basis
+    for byte in s.to_ascii_lowercase().bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3); // FNV prime
+    }
+    format!("{:x}", hash)
+}
+
 async fn process_book_and_store(
     file_path: String,
     app: &tauri::AppHandle,
@@ -30,9 +38,7 @@ async fn process_book_and_store(
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let covers_dir = app_dir.join("covers");
 
-    let mut hasher = DefaultHasher::new();
-    file_path.hash(&mut hasher);
-    let cache_filename = format!("{:x}.jpg", hasher.finish());
+    let cache_filename = format!("{}.jpg", generate_hash(&file_path));
     let local_cover_path = covers_dir.join(&cache_filename);
 
     if let Some(internal_path) = &package.cover {
