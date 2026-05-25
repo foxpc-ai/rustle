@@ -44,7 +44,7 @@ pub fn save_settings(
     state: State<'_, AppState>,
     settings: HashMap<String, String>,
 ) -> Result<(), String> {
-    let db = state.db.lock().unwrap();
+    let db = state.db.lock().map_err(|e| e.to_string())?;
 
     for (key, value) in settings {
         db.conn
@@ -59,7 +59,7 @@ pub fn save_settings(
 
 #[tauri::command]
 pub fn load_settings(state: State<'_, AppState>) -> Result<HashMap<String, String>, String> {
-    let db = state.db.lock().unwrap();
+    let db = state.db.lock().map_err(|e| e.to_string())?;
 
     let mut stmt = db
         .conn
@@ -86,7 +86,7 @@ pub fn update_last_position(
     position: String,
     progress: f64,
 ) -> Result<(), String> {
-    let db = state.db.lock().unwrap();
+    let db = state.db.lock().map_err(|e| e.to_string())?;
 
     db.conn
         .execute(
@@ -103,7 +103,7 @@ pub fn get_last_position(
     state: State<'_, AppState>,
     file_path: String,
 ) -> Result<Option<String>, String> {
-    let db = state.db.lock().unwrap();
+    let db = state.db.lock().map_err(|e| e.to_string())?;
 
     let mut stmt = db
         .conn
