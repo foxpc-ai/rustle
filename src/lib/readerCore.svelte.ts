@@ -47,7 +47,7 @@ export const readerCore = {
         const positionString = `${currentIndex}:${currentId}`;
 
         const totalChapters = flatToc.length > 1 ? flatToc.length - 1 : 1;
-        let bookProgress = currentIndex / totalChapters;
+        let bookProgress = activeTocIndex / totalChapters;
 
         await saveProgress(book.path, positionString, bookProgress);
     },
