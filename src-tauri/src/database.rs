@@ -1,8 +1,7 @@
-use crate::AppState;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection};
 use rusqlite_migration::{Migrations, M};
-use std::{collections::HashMap, fs, sync::LazyLock};
-use tauri::{AppHandle, Manager, State};
+use std::{fs, sync::LazyLock};
+use tauri::{AppHandle, Manager};
 
 pub struct Db {
     pub conn: Connection,
@@ -37,82 +36,4 @@ impl Db {
 
         Ok(Db { conn })
     }
-}
-
-#[tauri::command]
-pub fn save_settings(
-    state: State<'_, AppState>,
-    settings: HashMap<String, String>,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-
-    for (key, value) in settings {
-        db.conn
-            .execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-                params![key, value],
-            )
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-pub fn load_settings(state: State<'_, AppState>) -> Result<HashMap<String, String>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-
-    let mut stmt = db
-        .conn
-        .prepare("SELECT key, value FROM settings")
-        .map_err(|e| e.to_string())?;
-
-    let rows = stmt
-        .query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|e| e.to_string())?;
-    let mut map = HashMap::new();
-    for row in rows {
-        let (k, v) = row.map_err(|e| e.to_string())?;
-        map.insert(k, v);
-    }
-    Ok(map)
-}
-
-#[tauri::command]
-pub fn update_last_position(
-    state: State<'_, AppState>,
-    file_path: String,
-    position: String,
-    progress: f64,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-
-    db.conn
-        .execute(
-            "UPDATE books SET last_position = ?1, progress = ?2 WHERE file_path = ?3",
-            params![position, progress, file_path],
-        )
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[tauri::command]
-pub fn get_last_position(
-    state: State<'_, AppState>,
-    file_path: String,
-) -> Result<Option<String>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-
-    let mut stmt = db
-        .conn
-        .prepare("SELECT last_position FROM books WHERE file_path = ?1")
-        .map_err(|e| e.to_string())?;
-
-    let position = stmt
-        .query_row(params![file_path], |row| row.get::<_, Option<String>>(0))
-        .map_err(|e| e.to_string())?;
-
-    Ok(position)
 }
