@@ -5,16 +5,22 @@ use tauri::Manager;
 use tauri_plugin_log::{Builder, RotationStrategy, Target, TargetKind};
 
 use crate::{
+    annotations::{delete_annotation, get_annotations, save_annotation},
     book_view::{close_book, get_book_resource, get_chapter_content, open_book},
-    database::{get_last_position, load_settings, save_settings, update_last_position, Db},
+    database::Db,
     lib_view::{add_book, delete_book, get_library, remove_book, sync_library},
+    progress::{get_last_position, update_last_position},
+    settings::{load_settings, save_settings},
     utils::handle_epub_asset_request,
 };
 
-pub mod book_view;
-pub mod database;
-pub mod lib_view;
-pub mod utils;
+pub(crate) mod annotations;
+pub(crate) mod book_view;
+pub(crate) mod database;
+pub(crate) mod lib_view;
+pub(crate) mod progress;
+pub(crate) mod settings;
+pub(crate) mod utils;
 
 pub struct BookSession {
     pub mmap: Mmap,
@@ -72,7 +78,10 @@ pub fn run() {
             update_last_position,
             close_book,
             delete_book,
-            remove_book
+            remove_book,
+            get_annotations,
+            delete_annotation,
+            save_annotation
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
