@@ -10,7 +10,8 @@ export const readerPrefs = $state({
 export const readerStatus = $state({
     isLoading: false,
     showToc: false,
-    showSettings: false
+    showSettings: false,
+    showAnnotations: false,
 });
 
 export async function initSettings() {

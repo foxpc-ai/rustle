@@ -1,7 +1,6 @@
 <script lang="ts">
     import "$lib/styles/reader-theme.css";
     import { invoke } from "@tauri-apps/api/core";
-    import { onMount } from "svelte";
     import { fly } from "svelte/transition";
     import { goto } from "$app/navigation";
     import { library } from "$lib/eLibLoader.svelte";
@@ -11,13 +10,68 @@
         initSettings,
     } from "$lib/readerState.svelte";
     import { readerCore, scrollViewport } from "$lib/readerCore.svelte";
+    import { findRustleAncestor, getCharOffset } from "$lib/annotations.svelte";
     import NavTree from "$lib/components/NavTree.svelte";
     import SettingsModal from "$lib/components/reader/SettingsModal.svelte";
     import ReaderCanvas from "$lib/components/reader/ReaderCanvas.svelte";
+    import SelectionPopup from "$lib/components/reader/SelectionPopup.svelte";
+    import AnnotationsPanel from "$lib/components/reader/AnnotationsPanel.svelte";
     import { error } from "@tauri-apps/plugin-log";
+
+    let selectionCoords = $state<{ x: number; y: number } | null>(null);
+    let pendingSelection = $state<{
+        start: string;
+        end: string | null;
+        content: string;
+    } | null>(null);
+
+    function handleSelectionChange() {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+            selectionCoords = null;
+            pendingSelection = null;
+            return;
+        }
+
+        const range = sel.getRangeAt(0);
+        const content = sel.toString().trim();
+        if (!content) return;
+
+        const startAncestor = findRustleAncestor(range.startContainer);
+        const endAncestor = findRustleAncestor(range.endContainer);
+        if (!startAncestor || !endAncestor) return;
+
+        const startRustleId = startAncestor.getAttribute("data-rustle-id");
+        const endRustleId = endAncestor.getAttribute("data-rustle-id");
+        if (!startRustleId || !endRustleId) return;
+
+        const startOffset = getCharOffset(
+            startAncestor,
+            range.startContainer,
+            range.startOffset,
+        );
+        const endOffset = getCharOffset(
+            endAncestor,
+            range.endContainer,
+            range.endOffset,
+        );
+
+        const rect = range.getBoundingClientRect();
+        selectionCoords = {
+            x: rect.left + window.scrollX + rect.width / 2,
+            y: rect.top + window.scrollY - 45,
+        };
+
+        pendingSelection = {
+            start: `${readerCore.currentSpineIndex}:${startRustleId}:${startOffset}`,
+            end: `${readerCore.currentSpineIndex}:${endRustleId}:${endOffset}`,
+            content,
+        };
+    }
 
     function handleKeydown(e: KeyboardEvent) {
         if (readerStatus.showSettings || readerStatus.showToc) return;
+
         if (e.key === "ArrowRight") readerCore.goNext();
         if (e.key === "ArrowLeft") readerCore.goPrev();
 
@@ -31,27 +85,42 @@
         }
     }
 
-    onMount(() => {
-        const book = library.selectedBook;
+    async function handleExitReader() {
+        await readerCore.saveCurrentPosition();
+        try {
+            await invoke("close_book");
+        } catch (e) {
+            error(`Failed to close book session safely: ${e}`);
+        }
+        goto("/");
+    }
 
+    $effect(() => {
+        const book = library.selectedBook;
         if (!book) {
             goto("/");
             return;
         }
 
-        (async () => {
+        async function setupReader() {
             try {
                 await initSettings();
                 await readerCore.init();
             } catch (e) {
                 error(`Initialization error: ${e}`);
             }
-        })();
+        }
+        setupReader();
 
         window.addEventListener("keydown", handleKeydown);
+        document.addEventListener("selectionchange", handleSelectionChange);
 
         return () => {
             window.removeEventListener("keydown", handleKeydown);
+            document.removeEventListener(
+                "selectionchange",
+                handleSelectionChange,
+            );
         };
     });
 </script>
@@ -83,11 +152,39 @@
                         stroke-width="2"
                         aria-hidden="true"
                     >
-                        <line x1="4" x2="20" y1="6" y2="6" />
-                        <line x1="4" x2="20" y1="12" y2="12" />
-                        <line x1="4" x2="20" y1="18" y2="18" />
+                        <line x1="4" x2="20" y1="6" y2="6" /><line
+                            x1="4"
+                            x2="20"
+                            y1="12"
+                            y2="12"
+                        /><line x1="4" x2="20" y1="18" y2="18" />
                     </svg>
                 </button>
+
+                <button
+                    onclick={() =>
+                        (readerStatus.showAnnotations =
+                            !readerStatus.showAnnotations)}
+                    class="icon-btn"
+                    aria-label="Toggle Annotations"
+                    aria-expanded={readerStatus.showAnnotations}
+                >
+                    <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                    >
+                        <path d="M12 20h9" />
+                        <path
+                            d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                        />
+                    </svg>
+                </button>
+
                 <button
                     onclick={() =>
                         (readerStatus.showSettings =
@@ -120,15 +217,7 @@
             </span>
 
             <button
-                onclick={async () => {
-                    await readerCore.saveCurrentPosition();
-                    try {
-                        await invoke("close_book");
-                    } catch (e) {
-                        error(`Failed to close book session: ${e}`);
-                    }
-                    goto("/");
-                }}
+                onclick={handleExitReader}
                 class="icon-btn text-red-500/60 hover:text-red-500"
                 aria-label="Exit Reader"
             >
@@ -141,15 +230,24 @@
                     stroke-width="2"
                     aria-hidden="true"
                 >
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" x2="9" y1="12" y2="12" />
+                    <path
+                        d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
+                    /><polyline points="16 17 21 12 16 7" /><line
+                        x1="21"
+                        x2="9"
+                        y1="12"
+                        y2="12"
+                    />
                 </svg>
             </button>
         </header>
     </div>
 
     <SettingsModal />
+
+    <AnnotationsPanel />
+
+    <SelectionPopup chapterIndex={readerCore.currentSpineIndex} />
 
     {#if readerStatus.showToc}
         <div
@@ -170,7 +268,7 @@
                 <NavTree
                     items={readerCore.toc}
                     currentHref={readerCore.currentHref}
-                    onSelect={readerCore.loadChapter}
+                    onSelect={readerCore.loadChapter.bind(readerCore)}
                 />
             </nav>
         </div>
@@ -192,19 +290,15 @@
                 onclick={() => readerCore.goPrev()}
                 disabled={readerCore.activeTocIndex === 0}
                 class="nav-btn"
-                aria-label="Go to Previous Chapter"
+                aria-label="Go to Previous Chapter">Previous</button
             >
-                Previous
-            </button>
             <button
                 onclick={() => readerCore.goNext()}
                 disabled={readerCore.activeTocIndex ===
                     readerCore.flatToc.length - 1}
                 class="nav-btn"
-                aria-label="Go to Next Chapter"
+                aria-label="Go to Next Chapter">Next</button
             >
-                Next
-            </button>
         </footer>
     </main>
 

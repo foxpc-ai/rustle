@@ -3,36 +3,41 @@ import { library } from "$lib/eLibLoader.svelte";
 import { openBook, getChapter, flattenToc, type NavItem } from "$lib/eBookLoader";
 import { rewriteResourceUrls, saveProgress, getProgress } from "$lib/epubUtils";
 import { readerStatus } from "$lib/readerState.svelte";
+import { error } from "@tauri-apps/plugin-log";
+import {
+    applyHighlightsToDOM,
+    annotationStore,
+} from "$lib/annotations.svelte";
 
-let toc = $state<NavItem[]>([]);
-let flatToc = $state<NavItem[]>([]);
-let htmlContent = $state("");
-let currentIndex = $state(-1);
-let activeTocIndex = $state(0);
-let currentHref = $state("");
+const ID_REGEX = /<p(?=\s|>)/g;
 
-const idRegex = /<p(?=\s|>)/g;
+class ReaderCore {
+    toc = $state<NavItem[]>([]);
+    flatToc = $state<NavItem[]>([]);
+    htmlContent = $state("");
+    currentSpineIndex = $state(-1);
+    activeTocIndex = $state(0);
+    currentHref = $state("");
 
-export const readerCore = {
-    get toc() { return toc; },
-    get htmlContent() { return htmlContent; },
-    get activeTocIndex() { return activeTocIndex; },
-    get currentHref() { return currentHref; },
-    get flatToc() { return flatToc; },
+    private assignIds(content: string): string {
+        let idCounter = 0;
+        return content.replace(ID_REGEX, () => {
+            const newTag = `<p data-rustle-id="p-${idCounter}"`;
+            idCounter++;
+            return newTag;
+        });
+    }
 
-    async saveCurrentPosition() {
+    async saveCurrentPosition(): Promise<void> {
         const book = library.selectedBook;
-        if (!book || currentIndex === -1) return;
+        if (!book || this.currentSpineIndex === -1) return;
 
         const viewport = document.querySelector("#reader-viewport");
         const article = viewport?.querySelector("article");
-
         if (!viewport || !article) return;
 
         const scrollTarget = viewport.scrollTop + 20;
-
         const paras = article.querySelectorAll("[data-rustle-id]");
-
         let currentId = "p-0";
 
         for (const p of paras) {
@@ -44,30 +49,31 @@ export const readerCore = {
             currentId = htmlP.getAttribute("data-rustle-id") || "p-0";
         }
 
-        const positionString = `${currentIndex}:${currentId}`;
-
-        const totalChapters = flatToc.length > 1 ? flatToc.length - 1 : 1;
-        let bookProgress = activeTocIndex / totalChapters;
+        const positionString = `${this.currentSpineIndex}:${currentId}`;
+        const totalChapters = this.flatToc.length > 1 ? this.flatToc.length - 1 : 1;
+        const bookProgress = this.activeTocIndex / totalChapters;
 
         await saveProgress(book.path, positionString, bookProgress);
-    },
+    }
 
-    async loadChapter(spineIndex: number, href: string, targetId?: string) {
+    async loadChapter(spineIndex: number, href: string, targetId?: string): Promise<void> {
         const book = library.selectedBook;
         if (!book) return;
 
-        const isNewFile = currentIndex !== spineIndex;
-        currentHref = href;
-        activeTocIndex = flatToc.findIndex((i) => i.href === href);
+        const isNewFile = this.currentSpineIndex !== spineIndex;
+        this.currentHref = href;
+        this.activeTocIndex = this.flatToc.findIndex((i) => i.href === href);
         readerStatus.showToc = false;
 
-        if (isNewFile || !htmlContent) {
+        if (isNewFile || !this.htmlContent) {
             const loaderTimeout = setTimeout(() => (readerStatus.isLoading = true), 100);
             try {
                 const raw = await getChapter(book.path, spineIndex);
                 const withUrls = rewriteResourceUrls(raw, spineIndex);
-                htmlContent = assignIds(withUrls);
-                currentIndex = spineIndex;
+                this.htmlContent = this.assignIds(withUrls);
+                this.currentSpineIndex = spineIndex;
+            } catch (err) {
+                error(`[ReaderCore] Failed loading chapter spine index ${spineIndex}: ${err}`);
             } finally {
                 clearTimeout(loaderTimeout);
                 readerStatus.isLoading = false;
@@ -75,6 +81,8 @@ export const readerCore = {
         }
 
         await tick();
+
+        applyHighlightsToDOM(spineIndex, annotationStore.items);
 
         const viewport = document.querySelector("#reader-viewport");
         if (targetId) {
@@ -86,68 +94,65 @@ export const readerCore = {
         }
 
         viewport?.scrollTo({ top: 0, behavior: "instant" });
-    },
+    }
 
-    async init() {
+    async init(): Promise<void> {
         const book = library.selectedBook;
         if (!book) return;
 
-        htmlContent = "";
-        currentIndex = -1;
-        currentHref = "";
-        activeTocIndex = 0;
-        toc = [];
-        flatToc = [];
+        this.htmlContent = "";
+        this.currentSpineIndex = -1;
+        this.currentHref = "";
+        this.activeTocIndex = 0;
+        this.toc = [];
+        this.flatToc = [];
 
-        const nested = await openBook(book.path);
-        toc = nested;
-        flatToc = flattenToc(nested);
+        try {
+            const nested = await openBook(book.path);
+            this.toc = nested;
+            this.flatToc = flattenToc(nested);
 
-        const savedPos = await getProgress(book.path);
+            await annotationStore.load(book.id);
 
-        if (savedPos && savedPos.includes(":")) {
-            const [spineIdxStr, paraId] = savedPos.split(":");
-            const spineIndex = parseInt(spineIdxStr);
+            const savedPos = await getProgress(book.path);
 
-            const chapter = flatToc.find(item => item.spine_index === spineIndex);
+            if (savedPos?.includes(":")) {
+                const [spineIdxStr, paraId] = savedPos.split(":");
+                const spineIndex = parseInt(spineIdxStr, 10);
+                const chapter = this.flatToc.find(item => item.spine_index === spineIndex);
 
-            if (chapter) {
-                await this.loadChapter(spineIndex, chapter.href, paraId);
-                return;
+                if (chapter) {
+                    await this.loadChapter(spineIndex, chapter.href, paraId);
+                    return;
+                }
             }
-        }
 
-        if (flatToc.length > 0) {
-            await this.loadChapter(flatToc[0].spine_index, flatToc[0].href);
+            if (this.flatToc.length > 0) {
+                await this.loadChapter(this.flatToc[0].spine_index, this.flatToc[0].href);
+            }
+        } catch (err) {
+            error(`[ReaderCore] Initializing reader path failed for ${book.path}: ${err}`);
         }
-    },
+    }
 
-    goNext() {
-        if (activeTocIndex < flatToc.length - 1) {
-            const next = flatToc[activeTocIndex + 1];
+    goNext(): void {
+        if (this.activeTocIndex < this.flatToc.length - 1) {
+            const next = this.flatToc[this.activeTocIndex + 1];
             this.loadChapter(next.spine_index, next.href);
         }
-    },
+    }
 
-    goPrev() {
-        if (activeTocIndex > 0) {
-            const prev = flatToc[activeTocIndex - 1];
+    goPrev(): void {
+        if (this.activeTocIndex > 0) {
+            const prev = this.flatToc[this.activeTocIndex - 1];
             this.loadChapter(prev.spine_index, prev.href);
         }
     }
-};
-
-function assignIds(content: string): string {
-    let idCounter = 0;
-
-    return content.replace(idRegex, (match) => {
-        const newTag = `<p data-rustle-id="p-${idCounter}"`;
-        idCounter++;
-        return newTag;
-    });
 }
 
-export function scrollViewport(direction: "up" | "down") {
+export const readerCore = new ReaderCore();
+
+export function scrollViewport(direction: "up" | "down"): void {
     const viewport = document.querySelector("#reader-viewport");
     if (!viewport) return;
 
