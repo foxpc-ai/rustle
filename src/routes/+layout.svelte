@@ -1,10 +1,13 @@
 <script>
+    import Toast from "$lib/components/Toast.svelte";
     import "../app.css";
 </script>
 
 <main>
     <slot />
 </main>
+
+<Toast />
 
 <style>
     :global(body) {
