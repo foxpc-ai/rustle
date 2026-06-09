@@ -2165,7 +2165,8 @@ dependencies = [
 [[package]]
 name = "light_epub"
 version = "0.1.0"
-source = "git+https://github.com/foxpc-ai/light-epub#8746513138422d87091c7189f16529dd348bcd6c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef386e63120f8c7200becde0f8ff76dc8c9e476e182686970605164c721d40aa"
 dependencies = [
  "miniz_oxide",
  "nom",

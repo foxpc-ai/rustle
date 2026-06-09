@@ -12,10 +12,6 @@ static MIGRATION_FILES: &[M<'static>] = &[
         env!("CARGO_MANIFEST_DIR"),
         "/migrations/01_init.sql"
     ))),
-    M::up(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/migrations/02_annotations.sql"
-    ))),
 ];
 
 static MIGRATIONS: LazyLock<Migrations<'static>> =
