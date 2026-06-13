@@ -14,21 +14,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: setup node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
 
-      - name: install pnpm
+      - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: latest
+          version: 10.23.0
 
-      - name: install Rust stable
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: install frontend dependencies
-        run: pnpm install --frozen-lockfile --allow-build=esbuild
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
       - name: Build and Release
         uses: tauri-apps/tauri-action@v0
