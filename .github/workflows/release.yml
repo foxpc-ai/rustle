@@ -28,7 +28,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: install frontend dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --allow-build=esbuild
 
       - name: Build and Release
         uses: tauri-apps/tauri-action@v0
